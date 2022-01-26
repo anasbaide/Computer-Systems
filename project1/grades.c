@@ -1,0 +1,205 @@
+/*
+  Ana Sofia Baide | UID: 118441368 | UMD Directory: abaide
+*/
+
+#include <stdio.h>
+#include <math.h>
+
+/*Definition of the array size for storing the assignment*/
+#define ARRAY_SIZE 50
+
+/*Prototypes*/
+int check_weight(int weights[], int num_assignment);
+double late_penalty(int score, int days_late, int day_penalty);
+int index_dropper(int index, int dropped_index[], int assign_drop);
+double num_score_calc(int weights[], int scores[],int days_lates[], int num_assignment, int day_penalty);
+double assign_dropper(int weights[], int scores[], int days_lates[], int num_assignment, int assign_drop, int day_penalty);
+double mean_calc(int scores[], int days_lates[], int late_penalty, int num_assignment);
+double standard_devi_calc(int scores[], int days_lates[], int day_penalty, int num_assignment, double mean);
+
+/*This program recieves grades from an assignment list and calculates a numeric score base on constrains
+  such as amount of assignments dropped, days lates and points deducted
+*/
+int main() {
+  /*
+    penalty_points is the amount of points deducted per day late
+    assign_drop is the amount of assignments dropped
+    assignments is the amounf of assignmments inputed
+    stat_info is answer of the user about printing statistical information 
+    assign_num is the variable where we store (temporally) the assignment number to pass it to the array
+    score is the variable where we store (temporally) the score of an assignment to pass it to the array
+    weight is the variable where we store (temporally the weight of an assignment to pass it to the array
+    scores[], weights[], and days_lates[] are the arrays where the information will be stored for computations
+    num_score is the calculation of the numeric score
+    mean is the calculation of the mean
+    standard_dev is the calculation of standard deviation
+   */
+  int penalty_points, assign_drop, assignments;
+  char stat_info;
+  int i, assign_num, score, weight, days_late;
+  int scores[ARRAY_SIZE], weights[ARRAY_SIZE], days_lates[ARRAY_SIZE];
+  double num_score = 0, mean, standard_dev;
+
+  /*Getting input from the user*/
+  scanf(" %d %d %c", &penalty_points, &assign_drop, &stat_info);
+  scanf(" %d", &assignments);
+
+  /*Populating arrays with the data*/
+  for(i = 0; i < assignments; i++){
+    scanf(" %d, %d, %d, %d", &assign_num, &score, &weight, &days_late);
+    scores[assign_num - 1] = score;
+    weights[assign_num - 1] = weight;
+    days_lates[assign_num - 1] = days_late;
+  }
+
+  if(check_weight(weights, assignments)){
+    /*Checks if assignments need to be drop to call proper function*/
+    if(assign_drop > 0){
+      num_score = assign_dropper(weights, scores, days_lates, assignments, assign_drop, penalty_points);
+    } else {
+      num_score = num_score_calc(weights, scores, days_lates, assignments, penalty_points);
+    }
+
+    /*Printing information and assignments in order*/
+    printf("Numeric Score: %5.4f\n", num_score);
+    printf("Points Penalty Per Day Late: %d\n", penalty_points);
+    printf("Number of Assignments Dropped: %d\n", assign_drop);
+    printf("Values Provided:\nAssignment, Score, Weight, Days Late\n");
+  
+    for(i = 0; i < assignments;i++){
+      printf("%d, %d, %d, %d\n", i + 1, scores[i], weights[i], days_lates[i]);
+    }
+
+    /*Check if statistical information is needed and prints it*/
+    if((stat_info == 'y') || (stat_info == 'Y')){
+      mean = mean_calc(scores, days_lates, penalty_points, assignments);
+      standard_dev = standard_devi_calc(scores, days_lates, penalty_points, assignments, mean);
+      printf("Mean: %5.4f, Standard Deviation: %5.4f\n", mean, standard_dev);
+    }
+  } else {
+    printf("ERROR: Invalid values provided\n");
+  }
+  return 0;
+}
+
+/*Function that checks if the weight of the assignments add 100%*/
+int check_weight(int weights[], int num_assignment){
+  int i, total_sum;
+  for (i = 0; i < num_assignment; i++) {
+    total_sum += weights[i];
+  }
+  if(total_sum == 100){
+    return 1;
+  }
+  return 0;
+}
+
+/*Calculates the numeric score if no assignments are dropped*/
+double num_score_calc(int weights[], int scores[], int days_lates[], int num_assignment, int day_penalty){
+  double total_sum = 0, penalty = 0;
+  int i;
+
+  for(i = 0; i < num_assignment; i++){
+    penalty = late_penalty(scores[i], days_lates[i], day_penalty);
+    total_sum += (weights[i] * penalty) / 100; 
+  }
+
+  return total_sum;
+}
+
+/*Calculates the numeric score considering the assignments that need to be dropped first*/
+double assign_dropper(int weights[], int scores[], int days_lates[], int num_assignment, int assign_drop, int day_penalty){
+  /*
+    assign_values is the array that stores the assignment values for each assignment
+    dropped_index is the array that stores the indexes of the assignments that should be dropped
+   */
+  int assign_values[ARRAY_SIZE], assign_num_ind[ARRAY_SIZE], i;
+  int dropped_index[ARRAY_SIZE], j, min_val, temp, temp2;
+  double total_sum = 0;
+  double numeric_score = 0;
+
+  /*Populate the assign_values array*/
+  for(i = 0; i < num_assignment; i++){
+    assign_values[i] = weights[i] * scores[i];
+    assign_num_ind[i] = i;
+  }
+
+  /*Sorting the array of assign_values from low to high and recording the index of the lowest n amount
+   of assignments.  
+   */ 
+  for(i = 0; i < assign_drop; i++){
+    min_val = i;
+    for(j = i + 1; j < num_assignment; j++){
+      if(assign_values[j] < assign_values[min_val]){
+	min_val = j;
+      }
+    }
+    
+    /*Perform swap and record the change*/
+    dropped_index[i] = assign_num_ind[min_val];
+
+    temp = assign_values[min_val];
+    temp2 = assign_num_ind[min_val];
+
+    assign_values[min_val] = assign_values[i];
+    assign_num_ind[min_val] = assign_num_ind[i];
+
+    assign_values[i] = temp;
+    assign_num_ind[i] = temp2;
+  }
+
+  /*Calculates numeric score ignoring dropped assignments*/
+  for(i = 0; i < num_assignment; i++){
+    if(index_dropper(i, dropped_index, assign_drop)){
+      total_sum += late_penalty(scores[i], days_lates[i], day_penalty);
+    }
+  }
+  
+  numeric_score = total_sum / (num_assignment - assign_drop);
+  
+  return numeric_score;
+}
+
+/*Applies the late penalty to a score*/
+double late_penalty(int score, int days_late, int day_penalty){
+  double calc_score = score - (days_late * day_penalty);
+  if(calc_score < 0){
+    return 0;
+  }
+  return calc_score;
+}
+
+/*Checks if the index of the score being added to the total sum is not a dropped score*/
+int index_dropper(int index, int dropped_index[], int assign_drop){
+  int i;
+  for(i = 0; i < assign_drop; i++){
+    if(index == dropped_index[i]){
+      return 0;
+    }
+  }
+  return 1;
+}
+
+/*Calculates the mean of the scores*/
+double mean_calc(int scores[], int days_lates[], int day_penalty, int num_assignment){
+  double total_sum = 0;
+  int i;
+  for(i = 0; i < num_assignment; i++){
+    total_sum += late_penalty(scores[i], days_lates[i], day_penalty);
+  }
+  return total_sum/num_assignment;
+}
+
+/*Calculates the standard deviation of the scores*/
+double standard_devi_calc(int scores[], int days_lates[], int day_penalty, int num_assignment, double mean){
+  double result = 0, summation = 0, penalty = 0;
+  int i;
+
+  for(i = 0; i < num_assignment; i++){
+    penalty = late_penalty(scores[i], days_lates[i], day_penalty);
+    summation += pow(penalty - mean, 2);
+  }
+  result = summation / (num_assignment);
+  result = sqrt(result);
+  return result;
+}
